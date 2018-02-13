@@ -15,7 +15,7 @@ I had to split the algorithm in two cases:
 
 About 200 iterations were executed using the twiddle, however after execution 50 the error stopped improving
 
-<img src='/plots/pid_controll.png'/>
+<img src='/plots/pid_controll2.png'/>
 
 <img src='/plots/cte.png'/>
 
