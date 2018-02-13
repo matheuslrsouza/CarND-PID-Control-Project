@@ -3,14 +3,105 @@
 #include "json.hpp"
 #include "PID.h"
 #include <math.h>
+#include <fstream>
+#include <chrono>
 
 // for convenience
 using json = nlohmann::json;
+using namespace std;
+using namespace std::chrono;
 
 // For converting back and forth between radians and degrees.
 constexpr double pi() { return M_PI; }
 double deg2rad(double x) { return x * pi() / 180; }
 double rad2deg(double x) { return x * 180 / pi(); }
+
+
+//twiddle function
+
+void write_file(PID& pid) { 
+
+  //header
+  ofstream header_file;
+  header_file.open("../data/twiddle_header.txt", fstream::out); //append
+  header_file << pid.p[0] << " " << pid.p[1] << " " << pid.p[2] << "\n"
+              << pid.dp[0] << " " << pid.dp[1] << " " << pid.dp[2] << "\n"
+              << pid.i_twiddle << "\n"
+              << pid.case_twiddle << "\n"
+              << pid.best_error;
+
+  header_file.close();
+
+  //body
+  //p[0] p[1] p[2] dp[0] dp[1] dp[2] tolerance err best_err
+  
+  ofstream body_file;
+  body_file.open("../data/twiddle_body.txt", fstream::out | fstream::app); //append
+
+  body_file << pid.p[0] << " " << pid.p[1] << " " << pid.p[2] << " " <<
+            pid.dp[0] << " " << pid.dp[1] << " " << pid.dp[2] << " " <<
+            (pid.dp[0] + pid.dp[1] + pid.dp[2]) << " " <<
+            pid.error << " " << pid.best_error << '\n';
+
+  body_file.close();
+}
+
+void readParams(PID& pid) {
+  std::ifstream infile("../data/twiddle_header.txt");
+
+  //reads the header (see data/readme-twiddle.txt)
+  infile >> pid.p[0] >> pid.p[1] >> pid.p[2];
+  infile >> pid.dp[0] >> pid.dp[1] >> pid.dp[2];
+  infile >> pid.i_twiddle;
+  infile >> pid.case_twiddle;
+  infile >> pid.best_error;
+}
+
+void twiddle(PID& pid) {
+  double tol = 0.002;
+  double cur_tol = pid.dp[0] + pid.dp[1] +pid.dp[2];
+  
+  if (cur_tol > tol) {
+
+    if (pid.case_twiddle == 1) {
+      if (pid.error < pid.best_error) {
+        pid.best_error = pid.error;
+        pid.dp[pid.i_twiddle] *= 1.1; //increase dp 10%
+        if (pid.i_twiddle == 2) {
+          pid.i_twiddle = 0;
+        } else {
+          pid.i_twiddle += 1;
+          //pid.i_twiddle = 2;//ignore integration param
+        }
+      } else {
+        pid.p[pid.i_twiddle] -= 2.0*pid.dp[pid.i_twiddle]; //decrease p to opsite dp (negative)
+        pid.case_twiddle = 2;
+      }
+    } else if (pid.case_twiddle == 2) {
+      if (pid.error < pid.best_error) {
+        pid.best_error = pid.error;
+        pid.dp[pid.i_twiddle] *= 1.1; //increase dp 10%        
+      } else {
+        pid.p[pid.i_twiddle] += pid.dp[pid.i_twiddle]; //back to initial position
+        pid.dp[pid.i_twiddle] *= 0.9; //decrease dp 10%
+      }
+
+      //sempre que chegamos nesse ultimo passo (case 2), devemos testar o proximo param
+      if (pid.i_twiddle == 2) {
+        pid.i_twiddle = 0;
+      } else {
+        pid.i_twiddle += 1;
+        //pid.i_twiddle = 2;//ignore integration param
+      }
+
+      pid.case_twiddle = 1;
+    }
+  }
+
+  write_file(pid);
+}
+
+
 
 // Checks if the SocketIO event has JSON data.
 // If there is data the JSON object in string format will be returned,
@@ -32,10 +123,27 @@ int main()
 {
   uWS::Hub h;
 
-  PID pid;
-  // TODO: Initialize the pid variable.
+  int it = 0;
+  int i_twiddle_inited = 10000;
+  bool init_twiddle = false;
+  bool enable_twiddle = false;
+  high_resolution_clock::time_point prev_t;
 
-  h.onMessage([&pid](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
+  // Initialize the pid variable.
+  PID pid;  
+  readParams(pid);
+
+  if (pid.case_twiddle == 1 && enable_twiddle) {
+    pid.p[pid.i_twiddle] += pid.dp[pid.i_twiddle];
+  }
+
+  std::cout <<"PID "<< pid.p[0] << " " << pid.p[1] << " " << pid.p[2] << "\n"
+              <<"Dp "<< pid.dp[0] << " " << pid.dp[1] << " " << pid.dp[2] << "\n"
+              <<"i "<< pid.i_twiddle << "\n"
+              << "case #"<< pid.case_twiddle << "\n"
+              << "best_err "<< pid.best_error << std::endl;  
+
+  h.onMessage([&pid, &it, &i_twiddle_inited, &init_twiddle, &enable_twiddle, &prev_t](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
     // The 2 signifies a websocket event
@@ -52,18 +160,77 @@ int main()
           double angle = std::stod(j[1]["steering_angle"].get<std::string>());
           double steer_value;
           /*
-          * TODO: Calcuate steering value here, remember the steering value is
+          * Calcuate steering value here, remember the steering value is
           * [-1, 1].
           * NOTE: Feel free to play around with the throttle and speed. Maybe use
           * another PID controller to control the speed!
           */
+
+          it+=1;
+
+          double p, i, d;
+          p = pid.p[0];
+          i = pid.p[1];
+          d = pid.p[2];
+
+          high_resolution_clock::time_point t2 = high_resolution_clock::now();
           
-          // DEBUG
-          std::cout << "CTE: " << cte << " Steering Value: " << steer_value << std::endl;
+          duration<double> time_span = duration_cast<duration<double>>(t2 - prev_t);
+          double delta_t = time_span.count();
+
+          if (fabs(delta_t) < 0.0001) {
+            delta_t = 1;
+          }
+
+          delta_t = delta_t / speed;
+
+          double diff_cte = (cte - pid.prev_cte) / delta_t;
+          pid.integral_cte += cte;
+          steer_value = -p * cte - d * diff_cte - i * pid.integral_cte;
+
+          //normalizing streer
+          if (steer_value > 1) steer_value = 1;
+          if (steer_value < -1) steer_value = -1;
+
+          pid.prev_cte = cte;
 
           json msgJson;
           msgJson["steering_angle"] = steer_value;
-          msgJson["throttle"] = 0.3;
+
+          msgJson["throttle"] = 0.5;
+          
+          // DEBUG
+          std::cout << "CTE: ("<< it << ") "<< cte << " Steering Value: " << steer_value << " Speed: " << speed << std::endl;
+
+          
+          std::cout << "delta_t: " << delta_t << endl;
+          prev_t = t2;
+
+          double speed_limit = 30.0;
+
+          //inicia o twiddle quando chegar na velocidade de 15mph
+          if (it == 200 && init_twiddle == false) {
+            init_twiddle = true;
+            i_twiddle_inited = it;
+          }
+
+          if (speed > speed_limit) {
+              msgJson["throttle"] = -0.1;
+            } else {
+              msgJson["throttle"] = speed_limit - speed;
+            }
+
+          if (init_twiddle && it < i_twiddle_inited * 7) {
+            pid.error += pow(cte, 2.0);           
+
+          } else if (it > i_twiddle_inited * 7) {
+            std::cout << "***** error: " << pid.error << std::endl;
+            if (enable_twiddle) {
+              twiddle(pid);
+              return -1;
+            }
+          }
+          
           auto msg = "42[\"steer\"," + msgJson.dump() + "]";
           std::cout << msg << std::endl;
           ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
