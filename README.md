@@ -41,7 +41,7 @@ This parameter is responsible for smoothing the direction to the correct path. B
 
 [![p=3, d=0.5](https://img.youtube.com/vi/KmKV1KW_3_A/0.jpg)](https://youtu.be/KmKV1KW_3_A)
 
-## Faixa de execução Twiddle
+## Twiddle Run Range
 
 For the execution of the twiddle I started to calculate the error from iteration 200 to 1400. This run range was chosen because there is a straighter stretch and there are also curves.
 
@@ -52,3 +52,10 @@ In order for the car to complete the lap at maximum speed, I added the speed to 
 `double diff_cte = (cte - pid.prev_cte) / (delta_t / speed);`
 
 This makes the higher the speed of the vehicle, the more relevant the value of the parameter `D`
+
+## Complete lap video 
+
+Below is a video of the car making a complete lap, using the selected parameters.
+I had to record using the phone, because when I tried to use QuickTime to record the screen, the performance was compromised and the car could not complete the lap.
+
+[![complete lap](https://img.youtube.com/vi/PzIuwHrB5co/0.jpg)](https://youtu.be/PzIuwHrB5co)

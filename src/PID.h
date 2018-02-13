@@ -2,6 +2,9 @@
 #define PID_H
 
 #include <vector>
+#include <chrono>
+
+using namespace std::chrono;
 
 class PID {
 public:
@@ -10,9 +13,12 @@ public:
   */
   double error;
 
+  double p_error;
+  double i_error;
+  double d_error;
+
 
   double prev_cte;
-  double integral_cte;
 
   /*
   * Coefficients
@@ -36,6 +42,18 @@ public:
   * Destructor.
   */
   virtual ~PID();
+
+  /*
+  * Update the PID error variables given cross track error.
+  */
+  void UpdateError(double cte, high_resolution_clock::time_point prev_t, 
+    high_resolution_clock::time_point t2, double speed);
+
+  /*
+  * Calculate the total PID error.
+  */
+  double TotalError();
+
 };
 
 #endif /* PID_H */

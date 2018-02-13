@@ -157,79 +157,52 @@ int main()
           // j[1] is the data JSON object
           double cte = std::stod(j[1]["cte"].get<std::string>());
           double speed = std::stod(j[1]["speed"].get<std::string>());
-          double angle = std::stod(j[1]["steering_angle"].get<std::string>());
-          double steer_value;
-          /*
-          * Calcuate steering value here, remember the steering value is
-          * [-1, 1].
-          * NOTE: Feel free to play around with the throttle and speed. Maybe use
-          * another PID controller to control the speed!
-          */
-
+          
           it+=1;
 
-          double p, i, d;
-          p = pid.p[0];
-          i = pid.p[1];
-          d = pid.p[2];
-
           high_resolution_clock::time_point t2 = high_resolution_clock::now();
-          
-          duration<double> time_span = duration_cast<duration<double>>(t2 - prev_t);
-          double delta_t = time_span.count();
 
-          if (fabs(delta_t) < 0.0001) {
-            delta_t = 1;
-          }
-
-          delta_t = delta_t / speed;
-
-          double diff_cte = (cte - pid.prev_cte) / delta_t;
-          pid.integral_cte += cte;
-          steer_value = -p * cte - d * diff_cte - i * pid.integral_cte;
+          pid.UpdateError(cte, prev_t, t2, speed);
+          double steer_value = pid.TotalError();
 
           //normalizing streer
           if (steer_value > 1) steer_value = 1;
           if (steer_value < -1) steer_value = -1;
 
           pid.prev_cte = cte;
+          prev_t = t2;
 
           json msgJson;
           msgJson["steering_angle"] = steer_value;
-
-          msgJson["throttle"] = 0.5;
+          msgJson["throttle"] = 0.5;          
           
-          // DEBUG
-          std::cout << "CTE: ("<< it << ") "<< cte << " Steering Value: " << steer_value << " Speed: " << speed << std::endl;
-
-          
-          std::cout << "delta_t: " << delta_t << endl;
-          prev_t = t2;
-
           double speed_limit = 30.0;
 
-          //inicia o twiddle quando chegar na velocidade de 15mph
-          if (it == 200 && init_twiddle == false) {
+          //init twiddle when enabled
+          if (it == 200 && init_twiddle == false && enable_twiddle) {
             init_twiddle = true;
             i_twiddle_inited = it;
           }
 
+          //control the speed
           if (speed > speed_limit) {
               msgJson["throttle"] = -0.1;
-            } else {
-              msgJson["throttle"] = speed_limit - speed;
-            }
+          } else {
+            msgJson["throttle"] = speed_limit - speed;
+          }
 
           if (init_twiddle && it < i_twiddle_inited * 7) {
-            pid.error += pow(cte, 2.0);           
-
-          } else if (it > i_twiddle_inited * 7) {
-            std::cout << "***** error: " << pid.error << std::endl;
+            pid.error += pow(cte, 2.0);
+          } else if (it > i_twiddle_inited * 7) {            
             if (enable_twiddle) {
+              std::cout << "***** error: " << pid.error << std::endl;
               twiddle(pid);
-              return -1;
+              //return -1;
             }
           }
+
+          // DEBUG
+          std::cout << "CTE: ("<< it << ") "<< cte << " Steering Value: " << steer_value << " Speed: " << speed << std::endl;
           
           auto msg = "42[\"steer\"," + msgJson.dump() + "]";
           std::cout << msg << std::endl;
