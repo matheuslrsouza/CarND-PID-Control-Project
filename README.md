@@ -25,9 +25,9 @@ Although the twiddle did its job, when running again with the best parameter sel
 
 The `P` parameter is responsible for driving the car back to the trajectory, the higher the value, the faster the car will be directed to the trajectory. Below are 2 videos using the values `0.1` and` 3`
 
-<iframe width="300" height="300" src="https://www.youtube.com/embed/0LmdlgHjTvI" frameborder="0" allowfullscreen></iframe>
+[![p=0.1](https://img.youtube.com/vi/0LmdlgHjTvI/0.jpg)](https://youtu.be/0LmdlgHjTvI)
 
-<iframe width="300" style="margin-left:50px" height="300" src="https://www.youtube.com/embed/a6WqhT-X52E" frameborder="0" allowfullscreen></iframe>
+[![p=3](https://img.youtube.com/vi/a6WqhT-X52E/0.jpg)](https://youtu.be/a6WqhT-X52E)
 
 ## I parameter
 
@@ -35,9 +35,11 @@ The `I` parameter was selected manually, because in the execution of the twiddle
 
 ## D parameter
 
-This parameter is responsible for smoothing the direction to the correct path. Below are 2 videos, the first without using the parameter `D`
+This parameter is responsible for smoothing the direction to the correct path. Below are 2 videos, the first uses only the parameter `P` with value equals `3` and the second uses the same `P`, and `D` with value equals `0.5`
 
+[![p=3](https://img.youtube.com/vi/a6WqhT-X52E/0.jpg)](https://youtu.be/a6WqhT-X52E)
 
+[![p=3, d=0.5](https://img.youtube.com/vi/KmKV1KW_3_A/0.jpg)](https://youtu.be/KmKV1KW_3_A)
 
 ## Faixa de execução Twiddle
 
